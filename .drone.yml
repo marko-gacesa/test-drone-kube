@@ -1,0 +1,135 @@
+kind: pipeline
+type: kubernetes
+name: runtests
+
+steps:
+  - name: redis-wait
+    image: redis
+    commands:
+      - failure=0
+      - while [ true ]; do
+      - redis-cli -h redis ping
+      - if [ $? -eq 0 ];then exit 0; fi
+      - sleep 1
+      - failure=$[$failure+1]
+      - if [ $failure -gt 30 ]; then exit 1; fi
+      - echo "Waiting for redis..."
+      - done
+
+  - name: show-netrc
+    image: alpine:latest
+    commands:
+      - "[ -f /root/.netrc ] && cat /root/.netrc || echo 'netrc file does not exist'"
+    depends_on:
+      - clone
+
+  - name: env
+    image: alpine:latest
+    commands:
+      - cat /run/drone/env
+      - pwd
+      - env | grep DRONE_BUILD
+      - env | grep DRONE_STAGE
+      - env | grep DRONE_STEP
+    depends_on:
+      - clone
+
+  - name: redis-test
+    image: redis
+    commands:
+      - sleep 5
+      - redis-cli -h redis ping
+      - redis-cli -h redis set FOO bar
+      - redis-cli -h redis get FOO
+    depends_on:
+      - redis-wait
+
+  - name: go-env
+    image: golang
+    commands:
+      - go version
+      - go env
+    depends_on:
+      - clone
+
+  - name: go-test
+    image: golang
+    volumes:
+      - name: gomodcache
+        path: /go/pkg/mod
+    commands:
+      - go test ./... -cover -race
+    depends_on:
+      - redis-test
+      - go-env
+
+  - name: go-cover
+    image: golang
+    volumes:
+      - name: gomodcache
+        path: /go/pkg/mod
+    commands:
+      - go test ./... -coverprofile=coverage.out
+      - go tool cover -html=coverage.out -o coverage.html
+    depends_on:
+      - redis-test
+      - go-env
+
+  - name: test-join
+    image: alpine:latest
+    depends_on:
+      - go-test
+      - go-cover
+
+  - name: go-build
+    image: golang
+    volumes:
+      - name: gomodcache
+        path: /go/pkg/mod
+    commands:
+      - go build -v -o out-amd64
+    environment:
+      GOARCH: amd64
+      GOOS: linux
+    depends_on:
+      - test-join
+
+  - name: go-build-arm
+    image: golang
+    volumes:
+      - name: gomodcache
+        path: /go/pkg/mod
+    commands:
+      - go build -v -o out-arm64
+    environment:
+      GOARCH: arm64
+      GOOS: linux
+    depends_on:
+      - test-join
+
+  - name: show-result
+    image: ubuntu:20.04
+    commands:
+      - apt -y update
+      - apt-get install -y file
+      - ls -l out-amd64
+      - file out-amd64
+    depends_on:
+      - go-build
+      - go-build-arm
+
+  - name: exec
+    image: alpine:latest
+    commands:
+      - ./out-amd64 FOO
+    depends_on:
+      - go-build
+
+services:
+  - name: redis
+    image: redis
+
+volumes:
+  - name: gomodcache
+    temp: {}
+
