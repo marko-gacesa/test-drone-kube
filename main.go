@@ -19,7 +19,17 @@ func main() {
 		key = "test"
 	}
 
-	options, err := redis.ParseURL("redis://localhost:6379")
+	var host string
+
+	if len(os.Args) > 2 {
+		host = os.Args[2]
+	} else {
+		host = "localhost"
+	}
+
+	con := "redis://" + host + ":6379"
+
+	options, err := redis.ParseURL(con)
 	if err != nil {
 		panic(err)
 	}
@@ -31,6 +41,8 @@ func main() {
 		fmt.Printf("redis not accessibe: %v\n", err)
 		return
 	}
+
+	fmt.Printf("Connected to %s\n", con)
 
 	value, err := rdb.Get(context.Background(), key).Result()
 	if err != nil && err != redis.Nil {

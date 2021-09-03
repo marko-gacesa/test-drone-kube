@@ -71,15 +71,9 @@ steps:
     commands:
       - go test ./... -coverprofile=coverage.out
       - go tool cover -html=coverage.out -o coverage.html
-    depends_on:
-      - redis-test
-      - go-env
-
-  - name: test-join
-    image: alpine:latest
+      - ls -la
     depends_on:
       - go-test
-      - go-cover
 
   - name: go-build
     image: golang
@@ -88,11 +82,12 @@ steps:
         path: /go/pkg/mod
     commands:
       - go build -v -o out-amd64
+      - ls -l out-amd64
     environment:
       GOARCH: amd64
       GOOS: linux
     depends_on:
-      - test-join
+      - go-test
 
   - name: go-build-arm
     image: golang
@@ -101,11 +96,12 @@ steps:
         path: /go/pkg/mod
     commands:
       - go build -v -o out-arm64
+      - ls -l out-arm64
     environment:
       GOARCH: arm64
       GOOS: linux
     depends_on:
-      - test-join
+      - go-test
 
   - name: show-result
     image: ubuntu:20.04
@@ -113,17 +109,29 @@ steps:
       - apt -y update
       - apt-get install -y file
       - ls -l out-amd64
+      - ls -l out-arm64
       - file out-amd64
+      - file out-arm64
     depends_on:
       - go-build
       - go-build-arm
 
   - name: exec
-    image: alpine:latest
+    image: ubuntu:20.04
     commands:
-      - ./out-amd64 FOO
+      - ./out-amd64 FOO redis
     depends_on:
       - go-build
+
+  - name: finish
+    image: alpine:latest
+    commands:
+      - ls -la
+    depends_on:
+      - go-build
+      - go-build-arm
+      - show-result
+      - exec
 
 services:
   - name: redis
