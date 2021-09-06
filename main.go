@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
 	"dronetest/str"
 
@@ -50,8 +51,23 @@ func main() {
 		return
 	} else if err == redis.Nil {
 		fmt.Printf("Key %q has no value.\n", key)
-	} else {
-		fmt.Printf("Value for key %q is %q.\n", key, value)
-		fmt.Printf("Reversed value for key %q is %q.\n", key, str.Reverse(value))
+		return
+	}
+
+	fmt.Printf("Value for key %q is %q.\n", key, value)
+	fmt.Printf("Reversed value for key %q is %q.\n", key, str.Reverse(value))
+
+	n, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		// value is not an integer, we're done
+		return
+	}
+
+	n++
+	value = strconv.FormatInt(n, 10)
+
+	_, err = rdb.Set(context.Background(), key, value, 0).Result()
+	if err != nil {
+		fmt.Printf("failed to update redis value for key %q", key)
 	}
 }

@@ -16,64 +16,15 @@ steps:
       - echo "Waiting for redis..."
       - done
 
-  - name: show-netrc
-    image: alpine:latest
-    commands:
-      - "[ -f /root/.netrc ] && cat /root/.netrc || echo 'netrc file does not exist'"
-    depends_on:
-      - clone
-
-  - name: env
-    image: alpine:latest
-    commands:
-      - cat /run/drone/env
-      - pwd
-      - env | grep DRONE_BUILD
-      - env | grep DRONE_STAGE
-      - env | grep DRONE_STEP
-    depends_on:
-      - clone
-
   - name: redis-test
     image: redis
     commands:
       - sleep 5
       - redis-cli -h redis ping
-      - redis-cli -h redis set FOO bar
-      - redis-cli -h redis get FOO
+      - redis-cli -h redis set COUNTER 0
+      - redis-cli -h redis get COUNTER
     depends_on:
       - redis-wait
-
-  - name: go-env
-    image: golang
-    commands:
-      - go version
-      - go env
-    depends_on:
-      - clone
-
-  - name: go-test
-    image: golang
-    volumes:
-      - name: gomodcache
-        path: /go/pkg/mod
-    commands:
-      - go test ./... -cover -race
-    depends_on:
-      - redis-test
-      - go-env
-
-  - name: go-cover
-    image: golang
-    volumes:
-      - name: gomodcache
-        path: /go/pkg/mod
-    commands:
-      - go test ./... -coverprofile=coverage.out
-      - go tool cover -html=coverage.out -o coverage.html
-      - ls -la
-    depends_on:
-      - go-test
 
   - name: go-build
     image: golang
@@ -81,45 +32,134 @@ steps:
       - name: gomodcache
         path: /go/pkg/mod
     commands:
-      - go build -v -o out-amd64
-      - ls -l out-amd64
+      - go test ./...
+      - go build -v -o out
+      - ls -l out
     environment:
       GOARCH: amd64
       GOOS: linux
     depends_on:
-      - go-test
-
-  - name: go-build-arm
-    image: golang
-    volumes:
-      - name: gomodcache
-        path: /go/pkg/mod
-    commands:
-      - go build -v -o out-arm64
-      - ls -l out-arm64
-    environment:
-      GOARCH: arm64
-      GOOS: linux
-    depends_on:
-      - go-test
+      - redis-test
 
   - name: show-result
     image: ubuntu:20.04
     commands:
       - apt -y update
       - apt-get install -y file
-      - ls -l out-amd64
-      - ls -l out-arm64
-      - file out-amd64
-      - file out-arm64
+      - ls -l out
+      - file out
     depends_on:
       - go-build
-      - go-build-arm
 
-  - name: exec
+  - name: exec-01
     image: ubuntu:20.04
     commands:
-      - ./out-amd64 FOO redis
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-02
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-03
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-04
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-05
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-06
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-07
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-08
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-09
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-10
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-11
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-12
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-13
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-14
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-15
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
+    depends_on:
+      - go-build
+
+  - name: exec-16
+    image: ubuntu:20.04
+    commands:
+      - ./out COUNTER redis
     depends_on:
       - go-build
 
@@ -128,16 +168,25 @@ steps:
     commands:
       - ls -la
     depends_on:
-      - go-build
-      - go-build-arm
       - show-result
-      - exec
+      - exec-01
+      - exec-02
+      - exec-03
+      - exec-04
+      - exec-05
+      - exec-06
+      - exec-07
+      - exec-08
+      - exec-09
+      - exec-10
+      - exec-11
+      - exec-12
+      - exec-13
+      - exec-14
+      - exec-15
+      - exec-16
 
 services:
   - name: redis
     image: redis
-
-volumes:
-  - name: gomodcache
-    temp: {}
 
